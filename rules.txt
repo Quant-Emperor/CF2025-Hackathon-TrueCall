@@ -1,0 +1,15 @@
+#To test any of the 8 apis, try using a mobile phone number in the range +61400500800 to +61400500999 
+(the platform has been populated with mock data for these phone numbers for participants to test and build with).    
+
+
++61400500800 - able to verify number but location retrieval api is not working on mobile number range
++36371112222 - Valid
++99999991000
++99999991001 - Phone Number Mismatch
++99999990400
++99999990404
++99999990422
++99999990500
++99999990502
++99999990503
++99999990504
