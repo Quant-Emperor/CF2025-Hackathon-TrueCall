@@ -10,30 +10,37 @@ from kivy.uix.popup import Popup
 from kivy.clock import Clock
 from threading import Thread
 import requests, webbrowser, urllib.parse, time, os, configparser, httpx, ssl
-from dotenv import load_dotenv
 
-# --------- COLOR PALETTE ALIGNED TO LOGO ---------
-BG_COLOR = (0.97, 0.97, 0.98, 1)           # Off-white
+BG_COLOR = (0.98, 0.97, 0.95, 1)
 DEEP_BLUE = (0.05, 0.13, 0.28, 1)          # #0D2047 (TrueCall dark blue)
 BRIGHT_BLUE = (0.0, 0.31, 0.96, 1)         # #004EF4 (TrueCall bright blue)
 ORANGE = (0.95, 0.28, 0.12, 1)             # #F1471E (TrueCall orange)
 GREEN = (0.06, 0.75, 0.13, 1)               # #0FCB2D (TrueCall green)
 RED = (0.86, 0.15, 0.15, 1)                 # #DB2424 (TrueCall red)
 
-# Load environment variables
-load_dotenv('.env')
-API_KEY = os.getenv('api_key')
-
 ctx = ssl.create_default_context()
 ctx.check_hostname = False
 ctx.verify_mode = ssl.CERT_NONE
 http_client = httpx.Client(verify=ctx)
 from langchain_openai import ChatOpenAI
+
+config = configparser.ConfigParser()
+config.read('config.ini')
+AI_HOST = config.get('AI', 'host')
+AI_MODEL = config.get('AI', 'model')
+API_KEY = config.get('API', 'api_key')
+RAPID_API_HOST = config.get('RAPID_API', 'host')
+RAPID_API_KEY = config.get('RAPID_API', 'key')
+RAPID_API_LOCATION_RETRIEVAL_URL = config.get('RAPID_API', 'location_retrieval_url')
+RAPID_API_NUMBER_VERIFICATION_URL = config.get('RAPID_API', 'number_verification_url')
+RAPID_API_OAUTH2_URL = config.get('RAPID_API', 'oauth2_url')
+RAPID_API_OPENID_CONFIGURATION_URL = config.get('RAPID_API', 'openid_configuration_url')
+
 llm = ChatOpenAI(
     api_key=API_KEY,
-    base_url="",
+    base_url=AI_HOST,
     http_client=http_client,
-    model=""
+    model=AI_MODEL
 )
 
 def ai_describe_location(location_text):
@@ -49,11 +56,22 @@ class TruecallApp(App):
         from kivy.graphics import Color, RoundedRectangle, Rectangle
 
         root = BoxLayout(orientation='vertical', padding=0, spacing=0)
+        # Set BG_COLOR for the entire app window
+
+        root.clearcolor = BG_COLOR
+
+        with root.canvas.before:
+            Color(*BG_COLOR)
+            root.bg_rect = Rectangle(pos=root.pos, size=root.size)
+        def update_root_bg_rect(instance, value):
+            root.bg_rect.pos = root.pos
+            root.bg_rect.size = root.size
+        root.bind(pos=update_root_bg_rect, size=update_root_bg_rect)
 
         # --------- TOP LOGO ---------
         header = AnchorLayout(anchor_x='center', anchor_y='top', size_hint=(1, None), height=100)
         with header.canvas.before:
-            Color(0.97, 0.97, 0.98, 1)  # Off-white (same as BG_COLOR = (0.97, 0.97, 0.98, 1))
+            Color(*BG_COLOR)
             header.bg_rect = Rectangle(pos=header.pos, size=header.size)
 
         def update_bg_rect(instance, value):
@@ -65,6 +83,7 @@ class TruecallApp(App):
         logo_img = AsyncImage(source='truecall_logo.png', size_hint=(None, None), size=(220, 75), allow_stretch=True)
         header.add_widget(logo_img)
         root.add_widget(header)
+        # ...existing code...
 
         # --------- MAIN CARD ---------
         card = BoxLayout(orientation='vertical', spacing=14, padding=[22,18,22,18])
@@ -260,11 +279,11 @@ class TruecallApp(App):
 
     def fetch_endpoints(self):
         headers = {
-            'X-RapidAPI-Host': 'network-as-code.nokia.rapidapi.com',
-            'X-RapidAPI-Key': self.api_key
+            'X-RapidAPI-Host': RAPID_API_HOST,
+            'X-RapidAPI-Key': RAPID_API_KEY
         }
         try:
-            url = 'https://network-as-code.p-eu.rapidapi.com/.well-known/openid-configuration'
+            url = RAPID_API_OPENID_CONFIGURATION_URL
             print(f'Fetching endpoints from: {url}')
             response = requests.get(url, headers=headers, verify=False)
             print(f'Response status: {response.status_code}')
@@ -285,11 +304,11 @@ class TruecallApp(App):
 
     def fetch_client_credentials(self):
         headers = {
-            'X-RapidAPI-Host': 'network-as-code.nokia.rapidapi.com',
-            'X-RapidAPI-Key': self.api_key
+            'X-RapidAPI-Host': RAPID_API_HOST,
+            'X-RapidAPI-Key': RAPID_API_KEY
         }
         try:
-            url = 'https://network-as-code.p-eu.rapidapi.com/oauth2/v1/auth/clientcredentials'
+            url = RAPID_API_OAUTH2_URL
             print(f'Fetching credentials from: {url}')
             response = requests.get(url, headers=headers, verify=False)
             print(f'Response status: {response.status_code}')
@@ -356,13 +375,13 @@ class TruecallApp(App):
         phone = self.phone_input.text
         headers = {
             'Content-Type': 'application/json',
-            'X-RapidAPI-Host': 'network-as-code.nokia.rapidapi.com',
-            'X-RapidAPI-Key': self.api_key,
+            'X-RapidAPI-Host': RAPID_API_HOST,
+            'X-RapidAPI-Key': RAPID_API_KEY,
             'Authorization': f'Bearer {self.access_token}'
         }
         data = {"phoneNumber": phone}
         try:
-            url = 'https://network-as-code.p-eu.rapidapi.com/passthrough/camara/v1/number-verification/number-verification/v0/verify'
+            url = RAPID_API_NUMBER_VERIFICATION_URL
             print(f'Verifying number at: {url}')
             print(f'Request Headers: {headers}')
             print(f'Request Data: {data}')
@@ -388,12 +407,12 @@ class TruecallApp(App):
         phone = self.phone_input.text.strip()
         headers = {
             'Content-Type': 'application/json',
-            'X-RapidAPI-Host': 'network-as-code.nokia.rapidapi.com',
-            'X-RapidAPI-Key': self.api_key
+            'X-RapidAPI-Host': RAPID_API_HOST,
+            'X-RapidAPI-Key': RAPID_API_KEY
         }
-        data = {"device": {"phoneNumber": phone}, "maxAge": 60}
+        data = {"device": {"phoneNumber": phone}}
         try:
-            url = 'https://network-as-code.p-eu.rapidapi.com/location-retrieval/v0/retrieve'
+            url = RAPID_API_LOCATION_RETRIEVAL_URL
             print(f'Fetching location from: {url}')
             response = requests.post(url, headers=headers, json=data, verify=False)
             print(f'Response status: {response.status_code}')
@@ -570,7 +589,7 @@ class TruecallApp(App):
         popup_bg.add_widget(popup_content)
         from kivy.graphics import Color, Rectangle
         with popup_bg.canvas.before:
-            Color(0.97, 0.97, 0.98, 1)  # logo orange (F1471E)
+            Color(*BG_COLOR) 
             popup_bg.rect = Rectangle(pos=popup_bg.pos, size=popup_bg.size)
         popup_bg.bind(pos=lambda inst,v: popup_bg.rect.__setattr__('pos',v),
                     size=lambda inst,v: popup_bg.rect.__setattr__('size',v))
